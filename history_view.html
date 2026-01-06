@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ label }} - Números</title>
+  <style>
+    body{font-family:Arial; margin:20px;}
+    .top{display:flex; gap:12px; align-items:center; flex-wrap:wrap;}
+    .btn{
+      display:inline-block; padding:10px 12px; border-radius:12px;
+      border:1px solid #ccc; text-decoration:none; color:#111;
+    }
+    .btn:hover{background:#f5f5f5;}
+    .badge{
+      padding:8px 10px; border:1px solid #ddd; border-radius:12px;
+      background:#fafafa;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(10, minmax(60px, 1fr));
+      gap:8px;
+      margin-top:16px;
+    }
+    .cell{
+      padding:10px;
+      border:1px solid #0a0;
+      border-radius:10px;
+      background:#eaffea;
+      text-align:center;
+      user-select:none;
+      font-weight:bold;
+    }
+    .cell.editable{ cursor:pointer; }
+    .cell.editable:hover{ filter:brightness(0.97); }
+
+    .pillwrap{margin-top:16px;}
+    .pill{
+      display:inline-block; padding:6px 10px; border:1px solid #ddd;
+      border-radius:999px; margin:3px; background:#fff;
+    }
+    .hint{color:#444; margin-top:8px;}
+    .warn{
+      margin-top:12px;
+      padding:10px 12px;
+      border:1px solid #f0d3a0;
+      background:#fff4d6;
+      border-radius:12px;
+    }
+    #status{margin-left:8px; color:#b00020;}
+  </style>
+</head>
+<body>
+  <div class="top">
+    <a class="btn" href="/history">← Voltar</a>
+    <div style="font-size:18px; font-weight:bold;">{{ label }}</div>
+    <div class="badge">Total: <b id="count">{{ count }}</b></div>
+    <a class="btn" href="/">Tela principal</a>
+    <span id="status"></span>
+  </div>
+
+  {% if not can_edit %}
+    <div class="warn">
+      Este histórico está em <b>somente leitura</b> (ou o jogo está fechado no momento).
+    </div>
+  {% else %}
+    <div class="warn">
+      Você pode <b>remover</b> números daqui: basta <b>clicar</b> no número na grade.
+    </div>
+  {% endif %}
+
+  <div class="grid" id="grid">
+    {% for n in nums_str %}
+      <div class="cell {{ 'editable' if can_edit else '' }}" data-n="{{ n }}">{{ n }}</div>
+    {% endfor %}
+  </div>
+
+  <div class="pillwrap">
+    <div style="font-weight:bold;">Lista (pra copiar):</div>
+    <div class="hint">Dica: você pode selecionar e copiar essa lista.</div>
+    <div id="pillList" style="margin-top:8px;">
+      {% for n in nums_str %}
+        <span class="pill">{{ n }}</span>
+      {% endfor %}
+    </div>
+  </div>
+
+<script>
+const CAN_EDIT = {{ 'true' if can_edit else 'false' }};
+const ROUND_ID = "{{ round_id }}";
+
+function setStatus(msg){ document.getElementById("status").textContent = msg || ""; }
+
+function renderAll(nums){
+  // Atualiza contador
+  document.getElementById("count").textContent = nums.length;
+
+  // Atualiza grade
+  const grid = document.getElementById("grid");
+  grid.innerHTML = nums.map(n => `
+    <div class="cell ${CAN_EDIT ? 'editable' : ''}" data-n="${n}">${n}</div>
+  `).join("");
+
+  // Atualiza pills
+  const pillList = document.getElementById("pillList");
+  pillList.innerHTML = nums.map(n => `<span class="pill">${n}</span>`).join("");
+}
+
+async function removeNumber(nStr){
+  if(!CAN_EDIT) return;
+  const n = parseInt(nStr, 10);
+  if(Number.isNaN(n)) return;
+
+  try{
+    const res = await fetch(`/history/remove/${ROUND_ID}`, {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({number: n})
+    });
+    const data = await res.json();
+
+    if(!data.ok){
+      setStatus(data.error || "Erro");
+      return;
+    }
+    renderAll(data.numbers || []);
+    setStatus("");
+  }catch(e){
+    setStatus("Falha de rede");
+  }
+}
+
+document.getElementById("grid").addEventListener("click", (e) => {
+  const cell = e.target.closest(".cell");
+  if(!cell) return;
+  if(!CAN_EDIT) return;
+
+  const nStr = cell.dataset.n;
+  // confirmação leve pra não apagar sem querer
+  if(confirm(`Remover o número ${nStr}?`)){
+    removeNumber(nStr);
+  }
+});
+</script>
+</body>
+</html>

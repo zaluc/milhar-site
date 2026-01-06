@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Milhar - 000 a 999</title>
+  <style>
+    body{font-family:Arial; margin:20px;}
+    .top{display:flex; gap:12px; align-items:center; flex-wrap:wrap;}
+    .grid{display:grid; grid-template-columns:repeat(10, minmax(60px, 1fr)); gap:8px; margin-top:16px;}
+    .cell{
+      padding:10px; border:1px solid #ccc; border-radius:10px;
+      cursor:pointer; user-select:none; text-align:center;
+    }
+    .picked{border-color:#0a0; background:#eaffea;}
+    .closed{opacity:0.5; cursor:not-allowed;}
+    .banner{padding:10px; border-radius:10px; background:#fff4d6; border:1px solid #f3d38a;}
+    input{padding:10px; width:240px;}
+    .pill{display:inline-block; padding:4px 8px; border:1px solid #ddd; border-radius:999px; margin:2px;}
+  </style>
+</head>
+<body>
+  <div class="top">
+    <div>Logado como: <b>{{ current_user.username }}</b></div>
+    <div><b>{{ round_label }}</b></div>
+    <a href="/logout">Sair</a>
+    <a href="/confirm" target="_blank">Confirmar</a>
+    <a href="/history" target="_blank">Histórico</a>
+    {% if closed %}
+      <div class="banner">{{ closed_msg }}</div>
+    {% endif %}
+  </div>
+
+  <div style="margin-top:12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+    <input id="search" placeholder="Buscar/Marcar (ex: 007, 120)..." maxlength="3" />
+    <button id="btnSearch" style="padding:10px 14px;">Marcar</button>
+    <span id="status"></span>
+  </div>
+
+  <div style="margin-top:12px;">
+    <b>Total marcado neste período:</b> <span id="pickedCount">{{ picked_count }}</span>
+    <div id="pickedList" style="margin-top:8px; line-height:1.8;">
+      {% for s in picked_strs %}
+        <span class="pill">{{ s }}</span>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="grid" id="grid">
+    {% for n in range(0, 1000) %}
+      {% set is_picked = (n in picked) %}
+      <div class="cell {{ 'picked' if is_picked else '' }} {{ 'closed' if closed else '' }}"
+           data-n="{{ n }}">
+        {{ "%03d"|format(n) }}
+      </div>
+    {% endfor %}
+  </div>
+
+<script>
+const CLOSED = {{ 'true' if closed else 'false' }};
+
+function setStatus(msg){ document.getElementById("status").textContent = msg || ""; }
+
+function renderPickedList(nums){
+  const list = document.getElementById("pickedList");
+  const count = document.getElementById("pickedCount");
+  count.textContent = nums.length;
+  list.innerHTML = nums.map(n => `<span class="pill">${n}</span>`).join("");
+}
+
+async function toggleNumber(n){
+  if(CLOSED) { setStatus("Jogo fechado agora."); return; }
+
+  try{
+    const res = await fetch("/toggle", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({number: n})
+    });
+
+    const data = await res.json();
+    if(!data.ok){
+      setStatus(data.error || "Erro");
+      return;
+    }
+
+    const cell = document.querySelector(`.cell[data-n="${n}"]`);
+    if(cell) cell.classList.toggle("picked", data.picked);
+
+    if(Array.isArray(data.numbers)) renderPickedList(data.numbers);
+    setStatus("");
+  }catch(err){
+    setStatus("Falha de rede");
+  }
+}
+
+document.getElementById("grid").addEventListener("click", async (e) => {
+  const cell = e.target.closest(".cell");
+  if(!cell) return;
+  const n = parseInt(cell.dataset.n, 10);
+  await toggleNumber(n);
+});
+
+const searchInput = document.getElementById("search");
+const btnSearch = document.getElementById("btnSearch");
+
+function normalizeSearch(){
+  const v = searchInput.value.replace(/\D/g,'').slice(0,3);
+  searchInput.value = v;
+  return v;
+}
+
+async function markFromSearch(){
+  const v = normalizeSearch();
+  if(v.length === 0) return;
+
+  const n = parseInt(v, 10);
+  if(Number.isNaN(n)) return;
+
+  const cell = document.querySelector(`.cell[data-n="${n}"]`);
+  if(cell){
+    cell.scrollIntoView({behavior:"smooth", block:"center"});
+    cell.animate([{transform:"scale(1)"},{transform:"scale(1.08)"},{transform:"scale(1)"}], {duration:300});
+  }
+
+  await toggleNumber(n);
+}
+
+searchInput.addEventListener("input", normalizeSearch);
+searchInput.addEventListener("keydown", (e) => {
+  if(e.key === "Enter"){
+    e.preventDefault();
+    markFromSearch();
+  }
+});
+btnSearch.addEventListener("click", markFromSearch);
+</script>
+</body>
+</html>

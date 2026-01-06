@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Login - Milhar</title>
+  <style>
+    body{font-family:Arial; max-width:420px; margin:40px auto; padding:0 16px;}
+    input{width:100%; padding:10px; margin:8px 0;}
+    button{padding:10px 14px; width:100%;}
+    .msg{color:#b00020;}
+  </style>
+</head>
+<body>
+  <h2>Entrar</h2>
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <div class="msg">{{ messages[0] }}</div>
+    {% endif %}
+  {% endwith %}
+
+  <form method="post">
+    <input name="username" placeholder="Usuário" required />
+    <input name="password" type="password" placeholder="Senha" required />
+    <button type="submit">Entrar</button>
+  </form>
+</body>
+</html>
